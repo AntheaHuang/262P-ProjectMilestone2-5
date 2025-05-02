@@ -281,6 +281,120 @@ public class XMLTest {
     }
 
     /**
+     * Extract Nested Object from XML
+     */
+    @Test
+    public void shouldHandleExtractNestedObject(){
+        String xmlString = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"+
+            "<contact>\n"+
+            "  <nick>Crista </nick>\n"+
+            "  <name>Crista Lopes</name>\n" +
+            "  <address>\n" +
+            "    <street>Ave of Nowhere</street>\n" +
+            "    <zipcode>92614</zipcode>\n" +
+            "  </address>\n" +
+            "</contact>";
+
+        JSONObject extractResForNestedObject = XML.toJSONObject(new StringReader(xmlString),new JSONPointer("/contact/address/"));
+
+        String expectedStringForNestedObject = "{\"address\": {\"street\": \"Ave of Nowhere\",\"zipcode\": 92614}}"; 
+
+        Util.compareActualVsExpectedJsonObjects(extractResForNestedObject,new JSONObject(expectedStringForNestedObject));
+    }
+    
+    /**
+     * Extract Simple Object from XML
+     */
+    @Test
+    public void shouldHandleExtractSimpleObject(){
+        String xmlString = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"+
+            "<contact>\n"+
+            "  <nick>Crista </nick>\n"+
+            "  <name>Crista Lopes</name>\n" +
+            "  <address>\n" +
+            "    <street>Ave of Nowhere</street>\n" +
+            "    <zipcode>92614</zipcode>\n" +
+            "  </address>\n" +
+            "</contact>";
+        
+          
+        String expectedStringForSimpleObject = "{\"street\": \"Ave of Nowhere\"}";
+
+        JSONObject extractResForSimpleObject = XML.toJSONObject(new StringReader(xmlString),new JSONPointer("/contact/address/street/"));
+
+        Util.compareActualVsExpectedJsonObjects(extractResForSimpleObject,new JSONObject(expectedStringForSimpleObject));
+    }
+
+    /**
+     * Return empty object when sub-object path is not valid
+     */
+    @Test
+    public void shouldHandleExtractInvalidPath(){
+        String xmlString = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"+
+        "<contact>\n"+
+        "  <nick>Crista </nick>\n"+
+        "  <name>Crista Lopes</name>\n" +
+        "  <address>\n" +
+        "    <street>Ave of Nowhere</street>\n" +
+        "    <zipcode>92614</zipcode>\n" +
+        "  </address>\n" +
+        "</contact>";
+
+        JSONObject extractResForNonExistentPath = XML.toJSONObject(new StringReader(xmlString),new JSONPointer("/contact/nonexistent/"));
+
+        assertEquals("{}", extractResForNonExistentPath.toString());
+    }
+
+    /**
+     * Replace sub-object on a certain key path with another given JSON object
+     */
+    @Test
+    public void shouldHandleReplaceSuccess(){
+        String xmlString = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"+
+            "<contact>\n"+
+            "  <nick>Crista </nick>\n"+
+            "  <name>Crista Lopes</name>\n" +
+            "  <address>\n" +
+            "    <street>Ave of Nowhere</street>\n" +
+            "    <zipcode>92614</zipcode>\n" +
+            "  </address>\n" +
+            "</contact>";
+        
+            JSONObject replacement = XML.toJSONObject("<street>Ave of the Arts</street>\n");
+
+            String expectedreplaceSuccessRes = "{\"contact\":{\"nick\":\"Crista\" ,\"name\":\"Crista Lopes\",\"address\":{\"zipcode\":92614,\"street\":\"Ave of the Arts\"}}}";
+            JSONObject actulaReplaceSuccessRes = XML.toJSONObject(new StringReader(xmlString), new JSONPointer("/contact/address/street/"), replacement);
+
+            Util.compareActualVsExpectedJsonObjects(actulaReplaceSuccessRes,new JSONObject(expectedreplaceSuccessRes));
+    }
+
+    /**
+     * when given path is invalid, return the original object
+     */
+    @Test
+    public void shouldHandleReplaceFailure(){
+        String xmlString = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"+
+            "<contact>\n"+
+            "  <nick>Crista </nick>\n"+
+            "  <name>Crista Lopes</name>\n" +
+            "  <address>\n" +
+            "    <street>Ave of Nowhere</street>\n" +
+            "    <zipcode>92614</zipcode>\n" +
+            "  </address>\n" +
+            "</contact>";
+        
+            JSONObject replacement = XML.toJSONObject("<street>Ave of the Arts</street>\n");
+
+            String expectedreplaceFailureRes = "{\"contact\":{\"nick\":\"Crista\" ,\"name\":\"Crista Lopes\",\"address\":{\"zipcode\":92614,\"street\":\"Ave of Nowhere\"}}}";
+            JSONObject actulaReplaceSuccessRes = XML.toJSONObject(new StringReader(xmlString), new JSONPointer("/contact/nonexistent/"), replacement);
+
+            Util.compareActualVsExpectedJsonObjects(actulaReplaceSuccessRes,new JSONObject(expectedreplaceFailureRes));
+    }
+
+
+
+
+    /**
      * Tests to verify that supported escapes in XML are converted to actual values.
      */
     @Test
