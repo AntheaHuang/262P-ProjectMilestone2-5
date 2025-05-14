@@ -7,6 +7,7 @@ Public Domain.
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -21,6 +22,7 @@ import java.io.StringReader;
 import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 
 import org.json.*;
 import org.junit.Rule;
@@ -391,8 +393,118 @@ public class XMLTest {
             Util.compareActualVsExpectedJsonObjects(actulaReplaceSuccessRes,new JSONObject(expectedreplaceFailureRes));
     }
 
+    /**
+     * Add prefix to the key
+     */
+    @Test
+    public void shouldHandleAddPrefixToKey(){
+        String xmlString = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"+
+        "<contact>\n"+
+        "  <nick>Crista </nick>\n"+
+        "  <name>Crista Lopes</name>\n" +
+        "  <address>\n" +
+        "    <street>Ave of Nowhere</street>\n" +
+        "    <zipcode>92614</zipcode>\n" +
+        "  </address>\n" +
+        "</contact>";
+
+        Function<String, String> addPrefix = key -> "swe262_" + key;
+        JSONObject addedPrefixRes = XML.toJSONObject(new StringReader(xmlString),addPrefix);
+        String expectedRes = "{\"swe262_contact\":{\"swe262_nick\":\"Crista\" ,\"swe262_name\":\"Crista Lopes\",\"swe262_address\":{\"swe262_zipcode\":92614,\"swe262_street\":\"Ave of Nowhere\"}}}";
+        
+        Util.compareActualVsExpectedJsonObjects(addedPrefixRes, new JSONObject(expectedRes));
+    }
+
+    /**
+     * Reverse Key
+     */
+    @Test
+    public void shouldHandleReverseKey(){
+        String xmlString = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"+
+        "<contact>\n"+
+        "  <nick>Crista </nick>\n"+
+        "  <name>Crista Lopes</name>\n" +
+        "  <address>\n" +
+        "    <street>Ave of Nowhere</street>\n" +
+        "    <zipcode>92614</zipcode>\n" +
+        "  </address>\n" +
+        "</contact>";
+
+        Function<String, String> reverseKey = key -> new StringBuilder(key).reverse().toString();
+        JSONObject reverseKeyRes = XML.toJSONObject(new StringReader(xmlString),reverseKey);
+        String expectedRes = "{\"tcatnoc\":{\"kcin\":\"Crista\" ,\"eman\":\"Crista Lopes\",\"sserdda\":{\"edocpiz\":92614,\"teerts\":\"Ave of Nowhere\"}}}";
+        
+        Util.compareActualVsExpectedJsonObjects(reverseKeyRes, new JSONObject(expectedRes));
+    }
+
+    /**
+     * Transform the key into Uppercase
+     */
+    @Test
+    public void shouldHandleUppercaseKey(){
+        String xmlString = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"+
+        "<contact>\n"+
+        "  <nick>Crista </nick>\n"+
+        "  <name>Crista Lopes</name>\n" +
+        "  <address>\n" +
+        "    <street>Ave of Nowhere</street>\n" +
+        "    <zipcode>92614</zipcode>\n" +
+        "  </address>\n" +
+        "</contact>";
+
+        Function<String, String> uppercaseKey = key -> key.toUpperCase();
+        JSONObject uppercaseKeyRes = XML.toJSONObject(new StringReader(xmlString),uppercaseKey);
+        String expectedRes = "{\"CONTACT\":{\"NICK\":\"Crista\" ,\"NAME\":\"Crista Lopes\",\"ADDRESS\":{\"ZIPCODE\":92614,\"STREET\":\"Ave of Nowhere\"}}}";
+        
+        Util.compareActualVsExpectedJsonObjects(uppercaseKeyRes, new JSONObject(expectedRes));
+    }
+
+    /**
+     * Transform function turns the keys into empty string
+     */
+    @Test
+    public void shouldHandleEmptyNewKey(){
+        String xmlString = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"+
+        "<contact>\n"+
+        "  <nick>Crista </nick>\n"+
+        "  <name>Crista Lopes</name>\n" +
+        "  <address>\n" +
+        "    <street>Ave of Nowhere</street>\n" +
+        "    <zipcode>92614</zipcode>\n" +
+        "  </address>\n" +
+        "</contact>";
+
+        Function<String, String> emptyKey = key -> "";
+        JSONException e = assertThrows(JSONException.class, () -> {
+            XML.toJSONObject(new StringReader(xmlString),emptyKey);
+        });
+        
+        assertEquals("Transform key into empty string is forbidden!", e.getMessage());
+        
+    }
 
 
+    /**
+     * pass in null for the string transformation function
+     */
+    @Test
+    public void shouldHandleNullTransformationFunc(){
+        String xmlString = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"+
+        "<contact>\n"+
+        "  <nick>Crista </nick>\n"+
+        "  <name>Crista Lopes</name>\n" +
+        "  <address>\n" +
+        "    <street>Ave of Nowhere</street>\n" +
+        "    <zipcode>92614</zipcode>\n" +
+        "  </address>\n" +
+        "</contact>";
+
+        Function<String, String> nullFunc = null;
+        assertThrows(NullPointerException.class, () -> {
+            XML.toJSONObject(new StringReader(xmlString),nullFunc);
+        });
+        
+    }
 
     /**
      * Tests to verify that supported escapes in XML are converted to actual values.
