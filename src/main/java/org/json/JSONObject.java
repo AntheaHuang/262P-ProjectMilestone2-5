@@ -16,7 +16,10 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 /**
  * A JSONObject is an unordered collection of name/value pairs. Its external
@@ -3046,5 +3049,82 @@ public class JSONObject {
         }
         if (negativeFirstChar) {return "-0";}
         return "0";
+    }
+
+    private static class JSONObjectSpliterator implements Spliterator<JSONObject>{
+        private final Stack<Object> objectStack = new Stack<>();
+        private final Queue<JSONObject> bufferQueue = new ArrayDeque<>();
+    
+        public JSONObjectSpliterator(JSONObject jsonObject){
+            objectStack.push(Objects.requireNonNull(jsonObject));
+        }
+
+        @Override
+        public int characteristics() {
+            return Spliterator.DISTINCT | Spliterator.IMMUTABLE | Spliterator.NONNULL;
+        }
+
+        @Override
+        public long estimateSize() {
+            return Long.MAX_VALUE;
+        }
+
+        @Override
+        public Spliterator<JSONObject> trySplit(){
+            return null;
+        }
+
+        @Override 
+        public boolean tryAdvance(Consumer<? super JSONObject> action){
+            if (!bufferQueue.isEmpty()) {
+                // JSONObject curr = bufferQueue.poll();
+                // action.accept(curr);
+                // System.out.println("Emitted" + curr);
+                action.accept(bufferQueue.poll());
+                return true;
+            }
+
+            while(!objectStack.isEmpty()){
+                Object currObject = objectStack.pop();
+
+                if(currObject instanceof JSONObject){
+                    JSONObject tempObject = (JSONObject) currObject;
+                    for(String key : tempObject.keySet()){
+                        Object currValue = tempObject.get(key);
+
+                        if(currValue instanceof JSONObject || currValue instanceof JSONArray){
+                            objectStack.push(currValue);
+                        }else{
+                            JSONObject subObject = new JSONObject();
+                            subObject.put(key, currValue);
+                            bufferQueue.add(subObject);
+                        }
+                    }
+                }else if (currObject instanceof JSONArray){
+                    JSONArray currArr = (JSONArray) currObject;
+                    for(int i=currArr.length()-1; i>=0; i--){
+                        objectStack.push(currArr.get(i));
+                    }
+                }
+
+                if (!bufferQueue.isEmpty()) {
+                    // JSONObject curr = bufferQueue.poll();
+                    // action.accept(curr);
+                    // System.out.println("Emitted" + curr);
+                    action.accept(bufferQueue.poll());
+                    return true;
+                }
+
+            }
+            return false;
+        }
+    }
+    /**
+     * Use Spliterator to traverse and split the nodes iteratively by using stack
+     * @return the JSONObject as a Stream
+     */
+    public Stream<JSONObject> toStream() {
+        Spliterator<JSONObject> spliterator = new JSONObjectSpliterator(this);
+        return StreamSupport.stream(spliterator, false);
     }
 }

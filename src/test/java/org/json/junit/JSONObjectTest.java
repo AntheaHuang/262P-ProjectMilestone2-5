@@ -25,6 +25,7 @@ import java.math.BigInteger;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import org.json.CDL;
 import org.json.JSONArray;
@@ -3866,6 +3867,47 @@ public class JSONObjectTest {
         HashMap<String, Object> nestedMap = new HashMap<>();
         nestedMap.put("t", buildNestedMap(maxDepth - 1));
         return nestedMap;
+    }
+    
+    @Test
+    public void shouldHandleExtractWithStream(){
+        JSONObject obj = XML.toJSONObject(new StringReader( "<contact>\n"+
+        "  <nick>Crista </nick>\n"+
+        "  <name>Crista Lopes</name>\n" +
+        "  <address>\n" +
+        "    <street>Ave of Nowhere</street>\n" +
+        "    <zipcode>\"92614\"</zipcode>\n" +
+        "  </address>\n" +
+        "</contact>"));
+        List<String> values = obj.toStream()
+                .map(node -> node.getString(node.keys().next()))
+                .collect(Collectors.toList()); 
+        
+        List<String> expectedValues = Arrays.asList("Crista", "Crista Lopes","Ave of Nowhere","\"92614\"");
+
+        Collections.sort(expectedValues);
+        Collections.sort(values);
+        assertEquals(expectedValues, values);
+    }
+
+    @Test
+    public void shouldHandleFilterAndTransformWithStream(){
+        JSONObject obj = XML.toJSONObject("<Books><book><title>AAA</title><author>ASmith</author></book><book><title>BBB</title><author>BSmith</author></book></Books>");
+        List<String> authors = obj.toStream()
+                .filter(node -> node.has("author"))
+                .map(node -> node.getString("author").toUpperCase())
+                .collect(Collectors.toList());
+
+        List<String> expectedAuthors = Arrays.asList("ASMITH", "BSMITH");
+        assertEquals(expectedAuthors, authors);
+    }
+
+    @Test
+    public void shouldHandleForEachWithStream(){
+        JSONObject obj = XML.toJSONObject("<Books><book><title>AAA</title><author>ASmith</author></book><book><title>BBB</title><author>BSmith</author></book></Books>");
+        obj.toStream().forEach(node -> {
+                        System.out.println(node);
+                });
     }
 
 }
