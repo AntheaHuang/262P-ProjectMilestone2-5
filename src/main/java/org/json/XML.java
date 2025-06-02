@@ -9,6 +9,11 @@ import java.io.StringReader;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Iterator;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
@@ -1857,5 +1862,39 @@ public class XML {
             }
         }
         return jo;
+    }
+
+    
+    /**
+     * Read an XML file and convert it into a JSON Object asynchronously, allowing client code to proceed during the conversion
+     * Once the JSONObject is available, the onSuccess consumer is called with the result.
+     * If an error occurs during parsing, the onError consumer is called with the exception.
+     *
+     * @param reader The XML source reader.
+     * @param onSuccess A callback that will be invoked with the resulting JSONObject once parsing is complete.
+     * @param onError A callback that will be invoked with an Exception if parsing fails.
+     */
+    public static void toJSONObject(Reader reader, Consumer<JSONObject> onSuccess, Consumer<Exception> onError){
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try{
+            CompletableFuture.supplyAsync(()->{
+                try{
+                    return XML.toJSONObject(reader);
+                }catch (Exception e){
+                    throw new CompletionException(e);
+                }
+            },executor)
+            .thenAccept(onSuccess)
+            .exceptionally(ex -> {
+                onError.accept((Exception) ex.getCause());
+                return null;
+            })
+            .whenComplete((r, t) -> executor.shutdown());
+
+        }catch (Exception e){
+            onError.accept(e);
+        }
+
+        executor.shutdown();
     }
 }

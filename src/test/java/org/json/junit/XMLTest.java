@@ -7,6 +7,8 @@ Public Domain.
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -21,7 +23,11 @@ import java.io.Reader;
 import java.io.StringReader;
 import java.nio.charset.Charset;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import org.json.*;
@@ -505,6 +511,144 @@ public class XMLTest {
         });
         
     }
+
+    /**
+     * make sure the async method works - converting xml to json 
+     */
+    @Test
+    public void shouldHandleAsyncXMLToJSON() throws InterruptedException{
+        String xmlString = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"+
+        "<contact>\n"+
+        "  <nick>Crista </nick>\n"+
+        "  <name>Crista Lopes</name>\n" +
+        "  <address>\n" +
+        "    <street>Ave of Nowhere</street>\n" +
+        "    <zipcode>92614</zipcode>\n" +
+        "  </address>\n" +
+        "</contact>";
+        
+        JSONObject expectedRes = XML.toJSONObject(new StringReader(xmlString));
+
+        Reader reader = new StringReader(xmlString);
+
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<JSONObject> resultRef = new AtomicReference<>();
+        AtomicReference<Exception> errorRef = new AtomicReference<>();
+
+        XML.toJSONObject(
+            reader,
+            jo -> {
+                resultRef.set(jo);
+                latch.countDown();
+            },
+            e -> {
+                errorRef.set(e);
+                latch.countDown();
+            }
+        );
+
+        boolean completed = latch.await(3, TimeUnit.SECONDS);
+
+        assertTrue(completed);
+        assertNull(errorRef.get());
+        assertNotNull(resultRef.get());
+
+        JSONObject result = resultRef.get();
+
+        Util.compareActualVsExpectedJsonObjects(result, expectedRes);
+    }
+
+    private JSONObject transformKeysToUpperCase(JSONObject input) {
+        JSONObject transformed = new JSONObject();
+        for (Iterator<String> it = input.keys(); it.hasNext(); ) {
+            String key = it.next();
+            Object value = input.get(key);
+            if (value instanceof JSONObject) {
+                value = transformKeysToUpperCase((JSONObject) value);
+            }
+            transformed.put(key.toUpperCase(), value);
+        }
+        return transformed;
+    }
+
+    
+    /**
+     * make sure the async method works - converting xml to json then tranform the keys
+     */
+    @Test
+    public void shouldHandleAsyncTransformKeyAfterwards() throws InterruptedException {
+        String xmlString = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"+
+        "<contact>\n"+
+        "  <nick>Crista </nick>\n"+
+        "  <name>Crista Lopes</name>\n" +
+        "  <address>\n" +
+        "    <street>Ave of Nowhere</street>\n" +
+        "    <zipcode>92614</zipcode>\n" +
+        "  </address>\n" +
+        "</contact>";
+
+        Reader reader = new StringReader(xmlString);
+        
+        Function<String, String> uppercaseKey = key -> key.toUpperCase();
+        JSONObject expectedRes = XML.toJSONObject(new StringReader(xmlString),uppercaseKey);
+        
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<JSONObject> resultRef = new AtomicReference<>();
+        AtomicReference<Exception> errorRef = new AtomicReference<>();
+
+        XML.toJSONObject(
+            reader,
+            jo -> {
+                JSONObject transformed = transformKeysToUpperCase(jo);
+                resultRef.set(transformed);
+                latch.countDown();
+            },
+            e -> {
+                errorRef.set(e);
+                latch.countDown();
+            }
+        );
+
+        boolean completed = latch.await(3, TimeUnit.SECONDS);
+
+        assertTrue(completed);
+        assertNull(errorRef.get());
+        assertNotNull(resultRef.get());
+
+        JSONObject result = resultRef.get();
+
+        Util.compareActualVsExpectedJsonObjects(result, expectedRes);
+    }
+
+
+    /**
+     * make sure the async method throws exception when there's a problem
+     */
+    @Test
+    public void shouldHandleAsyncFailure() throws Exception {
+        Reader reader = null; 
+
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicReference<JSONObject> resultRef = new AtomicReference<>();
+        AtomicReference<Exception> errorRef = new AtomicReference<>();
+
+        XML.toJSONObject(
+            reader,
+            jo -> {
+                resultRef.set(jo);
+                latch.countDown();
+            },
+            e -> {
+                errorRef.set(e);
+                latch.countDown();
+            }
+        );
+
+        boolean completed = latch.await(3, TimeUnit.SECONDS);
+        assertTrue(completed);
+        assertNotNull(errorRef.get());
+    }
+
 
     /**
      * Tests to verify that supported escapes in XML are converted to actual values.
